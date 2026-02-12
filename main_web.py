@@ -42,7 +42,7 @@ def escape_html(text):
 
 # --- 3. UI BUILDER ---
 st.title("📢 BD Announcement Builder")
-st.write("Fill out the sections below. Use the button at the bottom to add more.")
+st.write("Fill out the sections below. Click \"Add Another Section\" to add more topics.")
 
 if 'section_count' not in st.session_state:
     st.session_state.section_count = 1
@@ -60,18 +60,38 @@ if st.button("➕ Add Another Section"):
     st.session_state.section_count += 1
     st.rerun()
 
+# New field for the sender's name
+st.divider()
+sender_name = st.text_input("Your Name (so brethren know who sent the announcement)", placeholder="e.g., Brother Jestoni")
+
 # --- 4. RECIPIENT SELECTION ---
 st.divider()
 st.subheader("👥 Select Recipients")
 
-# New field for the sender's name
-sender_name = st.text_input("Your Name", placeholder="e.g., Brother Jestoni")
-
 selected_groups = st.multiselect("Which groups should receive this?", groups)
 send_to_all = st.checkbox("🚨 SEND TO ALL OFFICERS", value=False)
 
+# --- NEW: LIVE RECIPIENT PREVIEW ---
+preview_list = []
+if send_to_all:
+    preview_list = [person['Name'] for person in all_records]
+elif selected_groups:
+    for person in all_records:
+        for group in selected_groups:
+            if str(person.get(group)).strip().lower() == "yes":
+                if person['Name'] not in preview_list:
+                    preview_list.append(person['Name'])
+                break
+
+if preview_list:
+    with st.expander(f"👁️ View Recipients ({len(preview_list)} people total)"):
+        # Sorts the names alphabetically for a cleaner look
+        st.write(", ".join(sorted(preview_list)))
+else:
+    st.caption("No recipients selected yet.")
+
 # --- 5. BROADCAST LOGIC ---
-if st.button("🚀 SEND BROADCAST", type="primary", use_container_width=True):
+if st.button("🚀 SEND ANNOUNCEMENT(S)", type="primary", use_container_width=True):
     # Determine recipients
     final_list = []
     if send_to_all:
