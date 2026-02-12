@@ -7,11 +7,23 @@ import time
 # --- 1. PASSWORD PROTECTION ---
 st.set_page_config(page_title="Blue Diamond Bulletin", page_icon="📢")
 
-# Simple security gate
-password = st.sidebar.text_input("Access Code", type="password")
-if password != "BD10":  # Change this to your desired password
-    st.info("Please enter the access code in the sidebar to begin.")
-    st.stop()
+# Initialize session state to keep the user logged in
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+
+# If not logged in, show the login screen
+if not st.session_state.authenticated:
+    # Use columns to center the login box
+    _, col, _ = st.columns([1, 2, 1])
+    with col:
+        st.write("## 🔐 Access Required")
+        pass_input = st.text_input("Enter Access Code", type="password")
+        if pass_input == "BD10":
+            st.session_state.authenticated = True
+            st.rerun()  # Instantly reloads the page to show the app
+        elif pass_input != "":
+            st.error("Incorrect Code")
+    st.stop()  # Stops the rest of the code from running until authenticated
 
 
 # --- 2. DATA SETUP ---
@@ -41,8 +53,8 @@ def escape_html(text):
 
 
 # --- 3. UI BUILDER ---
-st.title("📢 BD Announcement Builder")
-st.write("Fill out the sections below. Click \"Add Another Section\" to add more topics.")
+st.title("📢 Officer Announcement Tool 📢")
+st.write("Fill out the sections below. Click \"Add Another Topic\" to add more topics.")
 
 if 'section_count' not in st.session_state:
     st.session_state.section_count = 1
@@ -51,22 +63,23 @@ full_bulletin_data = []
 
 for i in range(st.session_state.section_count):
     with st.container(border=True):
-        st.subheader(f"Section {i + 1}")
+        st.subheader(f"Topic {i + 1}")
         s = st.text_input(f"Subject", key=f"s_{i}", placeholder="e.g., Leadership Updates")
         d = st.text_area(f"Details (Bulleted List)", key=f"d_{i}", placeholder="• Item 1\n• Item 2")
         full_bulletin_data.append({"subject": s, "details": d})
 
-if st.button("➕ Add Another Section"):
+if st.button("➕ Add Another Topic"):
     st.session_state.section_count += 1
     st.rerun()
 
 # New field for the sender's name
 st.divider()
+st.subheader("🫵🏽 Sender 🫵🏽")
 sender_name = st.text_input("Your Name (so brethren know who sent the announcement)", placeholder="e.g., Brother Jestoni")
 
 # --- 4. RECIPIENT SELECTION ---
 st.divider()
-st.subheader("👥 Select Recipients")
+st.subheader("👥 Select Recipients 👥")
 
 selected_groups = st.multiselect("Which groups should receive this?", groups)
 send_to_all = st.checkbox("🚨 SEND TO ALL OFFICERS", value=False)
@@ -84,9 +97,13 @@ elif selected_groups:
                 break
 
 if preview_list:
-    with st.expander(f"👁️ View Recipients ({len(preview_list)} people total)"):
-        # Sorts the names alphabetically for a cleaner look
-        st.write(", ".join(sorted(preview_list)))
+    # We sort the list alphabetically so it's easy to find a specific name
+    sorted_names = sorted(preview_list)
+
+    with st.expander(f"👁️ View Recipients ({len(sorted_names)} people total)"):
+        # We join the names with a newline and a bullet point
+        bulleted_list = "\n".join([f"* {name}" for name in sorted_names])
+        st.markdown(bulleted_list)
 else:
     st.caption("No recipients selected yet.")
 
