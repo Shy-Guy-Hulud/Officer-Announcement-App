@@ -41,7 +41,7 @@ def escape_html(text):
 
 
 # --- 3. UI BUILDER ---
-st.title("📢 Church Bulletin Builder")
+st.title("📢 Blue Diamond Officers Announcement Builder")
 st.write("Fill out the sections below. Use the button at the bottom to add more.")
 
 if 'section_count' not in st.session_state:
