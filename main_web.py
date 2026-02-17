@@ -53,7 +53,7 @@ def escape_html(text):
 
 
 # --- 3. UI BUILDER ---
-st.title("📢 Officer Announcement Tool 📢")
+st.title("📢 Officer Announcements")
 st.write("Fill out the sections below. Click \"Add Another Topic\" to add more topics.")
 
 if 'section_count' not in st.session_state:
@@ -74,12 +74,12 @@ if st.button("➕ Add Another Topic"):
 
 # New field for the sender's name
 st.divider()
-st.subheader("🫵🏽 Sender 🫵🏽")
+st.subheader("🫵🏽 Sender")
 sender_name = st.text_input("Your Name (so brethren know who sent the announcement)", placeholder="e.g., Brother Jestoni")
 
 # --- 4. RECIPIENT SELECTION ---
 st.divider()
-st.subheader("👥 Select Recipients 👥")
+st.subheader("👥 Select Recipients")
 
 selected_groups = st.multiselect("Which groups should receive this?", groups)
 send_to_all = st.checkbox("🚨 SEND TO ALL OFFICERS", value=False)
