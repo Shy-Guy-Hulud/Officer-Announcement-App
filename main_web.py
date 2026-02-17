@@ -13,18 +13,18 @@ if 'authenticated' not in st.session_state:
 
 # If not logged in, show the login screen
 if not st.session_state.authenticated:
-    # Use columns to center the login box
     _, col, _ = st.columns([1, 2, 1])
     with col:
         st.write("## 🔐 Access Required")
         pass_input = st.text_input("Enter Access Code", type="password")
-        if pass_input == "BD10":
+
+        # CHANGED: Reference the secret here
+        if pass_input == st.secrets["access_code"]:
             st.session_state.authenticated = True
-            st.rerun()  # Instantly reloads the page to show the app
+            st.rerun()
         elif pass_input != "":
             st.error("Incorrect Code")
-    st.stop()  # Stops the rest of the code from running until authenticated
-
+    st.stop()
 
 # --- 2. DATA SETUP ---
 @st.cache_resource
