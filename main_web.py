@@ -29,10 +29,13 @@ if not st.session_state.authenticated:
 # --- 2. DATA SETUP ---
 @st.cache_resource
 def get_gsheet_client():
-    # For local testing, this uses your credentials.json
-    # When you go live on Streamlit Cloud, we will use 'Secrets'
+    # UPDATED: Pulling from Streamlit Secrets instead of a local file
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    creds = Credentials.from_service_account_file('credentials.json', scopes=scopes)
+
+    # This uses the dictionary you'll paste into the Streamlit dashboard
+    creds_info = st.secrets["google_credentials"]
+    creds = Credentials.from_service_account_info(creds_info, scopes=scopes)
+
     return gspread.authorize(creds)
 
 
@@ -143,7 +146,7 @@ if st.button("🚀 SEND ANNOUNCEMENT(S)", type="primary", use_container_width=Tr
         success_count = 0
         progress_bar = st.progress(0)
 
-        BOT_TOKEN = "7673357117:AAEYynKrvT2vVtJSxs-lTIciu4XJXyv7Hjc"
+        BOT_TOKEN = st.secrets["telegram_token"]
 
         for idx, person in enumerate(final_list):
             url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
