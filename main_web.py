@@ -5,7 +5,7 @@ import requests
 import time
 
 # --- 1. PASSWORD PROTECTION ---
-st.set_page_config(page_title="Blue Diamond Bulletin", page_icon="📢")
+st.set_page_config(page_title="Officer Announcements", page_icon="📢")
 
 # Initialize session state to keep the user logged in
 if 'authenticated' not in st.session_state:
