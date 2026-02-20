@@ -175,7 +175,7 @@ if st.button("🚀 SEND ANNOUNCEMENT(S)", type="primary", use_container_width=Tr
             subj = escape_html(sec['subject']).strip()
             det = escape_html(sec['details']).strip()
             if subj:
-                parts.append(f"<b><u>{subj.upper()}</u></b>\n{det}")
+                parts.append(f"<b><u>{subj}</u></b>\n{det}")
 
         formatted_msg = "\n\n———\n\n".join(parts)
 
