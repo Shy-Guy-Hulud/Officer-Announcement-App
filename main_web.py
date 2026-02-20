@@ -80,6 +80,15 @@ st.divider()
 st.subheader("🫵🏽 Sender")
 sender_name = st.text_input("Your Name (so brethren know who sent the announcement)", placeholder="e.g., Brother Jestoni")
 
+# --- NEW: FILE UPLOAD SECTION ---
+st.divider()
+st.subheader("📎 Attachments (Optional)")
+uploaded_files = st.file_uploader(
+    "Upload images or a PDF",
+    accept_multiple_files=True,
+    type=['png', 'jpg', 'jpeg', 'pdf']
+)
+
 # --- 4. RECIPIENT SELECTION ---
 st.divider()
 st.subheader("👥 Select Recipients")
@@ -109,6 +118,39 @@ if preview_list:
         st.markdown(bulleted_list)
 else:
     st.caption("No recipients selected yet.")
+
+# --- NEW: LIVE PREVIEW ---
+st.divider()
+st.subheader("🖼️ Announcement Preview")
+
+with st.container(border=True):
+    # Construct the message text exactly as it will appear
+    preview_parts = []
+    for sec in full_bulletin_data:
+        subj = sec['subject'].strip()
+        det = sec['details'].strip()
+        if subj:
+            preview_parts.append(f"**{subj.upper()}**\n{det}")
+
+    preview_text = "\n\n---\n\n".join(preview_parts)
+    if sender_name:
+        preview_text += f"\n\n*Sent from {sender_name}*"
+
+    # UI Layout for the preview
+    if uploaded_files:
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            # Show the first uploaded file as the primary preview image
+            first_file = uploaded_files[0]
+            if first_file.type.startswith("image"):
+                st.image(first_file, caption="Primary Attachment")
+            else:
+                st.info(f"📄 {first_file.name} (Document)")
+        with col2:
+            st.markdown(preview_text)
+    else:
+        # Text-only preview
+        st.markdown(preview_text if preview_text else "*(Start typing above to see preview)*")
 
 # --- 5. BROADCAST LOGIC ---
 if st.button("🚀 SEND ANNOUNCEMENT(S)", type="primary", use_container_width=True):
@@ -149,21 +191,72 @@ if st.button("🚀 SEND ANNOUNCEMENT(S)", type="primary", use_container_width=Tr
         BOT_TOKEN = st.secrets["telegram_token"]
 
         for idx, person in enumerate(final_list):
-            url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-            payload = {
-                "chat_id": str(person['Chat_ID']),
-                "text": formatted_msg,
-                "parse_mode": "HTML",
-                "link_preview_options": {"is_disabled": True}
-            }
+            chat_id = str(person['Chat_ID'])
+            success = False
+
             try:
-                r = requests.post(url, json=payload)
+                # SCENARIO A: No files - Send standard Text message
+                if not uploaded_files:
+                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                    payload = {
+                        "chat_id": chat_id,
+                        "text": formatted_msg,
+                        "parse_mode": "HTML",
+                        "link_preview_options": {"is_disabled": True}
+                    }
+                    r = requests.post(url, json=payload)
+
+                # SCENARIO B: Single File (Image or PDF)
+                elif len(uploaded_files) == 1:
+                    file = uploaded_files[0]
+                    # Reset file pointer to beginning after each recipient
+                    file.seek(0)
+
+                    # Determine if it's a photo or document
+                    method = "sendPhoto" if file.type.startswith("image") else "sendDocument"
+                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
+
+                    files = {method.replace("send", "").lower(): file}
+                    payload = {
+                        "chat_id": chat_id,
+                        "caption": formatted_msg,
+                        "parse_mode": "HTML"
+                    }
+                    r = requests.post(url, data=payload, files=files)
+
+                # SCENARIO C: Multiple Files (Media Group / Album)
+                else:
+                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMediaGroup"
+                    media = []
+                    files = {}
+
+                    for i, f in enumerate(uploaded_files):
+                        f.seek(0)
+                        file_input_name = f"file{i}"
+                        files[file_input_name] = f
+
+                        # Attach the caption only to the FIRST item in the group
+                        media_item = {
+                            "type": "photo" if f.type.startswith("image") else "document",
+                            "media": f"attach://{file_input_name}"
+                        }
+                        if i == 0:
+                            media_item["caption"] = formatted_msg
+                            media_item["parse_mode"] = "HTML"
+                        media.append(media_item)
+
+                    payload = {"chat_id": chat_id, "media": requests.utils.quote(str(media).replace("'", '"'))}
+                    # Note: MediaGroup is complex; usually easier to send text THEN files if multi-file.
+                    r = requests.post(url, data={"chat_id": chat_id, "media": json.dumps(media)}, files=files)
+
                 if r.status_code == 200:
                     success_count += 1
-            except:
-                pass
+
+            except Exception as e:
+                print(f"Error sending to {person['Name']}: {e}")
+
             progress_bar.progress((idx + 1) / len(final_list))
-            time.sleep(0.05)
+            time.sleep(0.1)  # Slightly longer delay to avoid Telegram rate limits with files
 
         # 1. Define your personal ID
         MY_CHAT_ID = "222361137"
@@ -189,4 +282,4 @@ if st.button("🚀 SEND ANNOUNCEMENT(S)", type="primary", use_container_width=Tr
                 # We log this to the console so it doesn't interrupt the UI for the user
                 print(f"Admin notification failed: {e}")
 
-        st.success(f"Done! Broadcast sent to {success_count} officers.")
+        st.success(f"✅ Done! Sent to {success_count} officers with {len(uploaded_files)} attachment(s).")
