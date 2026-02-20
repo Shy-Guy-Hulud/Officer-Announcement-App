@@ -1,29 +1,51 @@
 import streamlit as st
+import extra_streamlit_components as stx
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
 import time
+from datetime import datetime, timedelta
 
 # --- 1. PASSWORD PROTECTION ---
 st.set_page_config(page_title="Officer Announcements", page_icon="📢")
 
+# --- COOKIE MANAGER SETUP ---
+# Adding a 'key' ensures it stays consistent across refreshes
+cookie_manager = stx.CookieManager(key="announcement_cookies")
+
+# The library now handles the "readiness" check internally.
+# We can just proceed to getting the cookie.
+auth_cookie = cookie_manager.get("is_authenticated")
+
+# Check if the "is_authenticated" cookie already exists
+auth_cookie = cookie_manager.get("is_authenticated")
+
+# Sync the cookie to session state
+if auth_cookie == "true":
+    st.session_state["authenticated"] = True
+
 # Initialize session state to keep the user logged in
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
 
-# If not logged in, show the login screen
-if not st.session_state.authenticated:
-    _, col, _ = st.columns([1, 2, 1])
-    with col:
-        st.write("## 🔐 Access Required")
-        pass_input = st.text_input("Enter Access Code", type="password")
+if not st.session_state["authenticated"]:
+    st.title("🔐 Visitation App")
+    with st.form("login_form"):
+        pwd_input = st.text_input("Enter Access Code", type="password")
+        if st.form_submit_button("Login"):
+            if pwd_input == st.secrets["access_code"]:
+                # 1. Update session state
+                st.session_state["authenticated"] = True
 
-        # CHANGED: Reference the secret here
-        if pass_input == st.secrets["access_code"]:
-            st.session_state.authenticated = True
-            st.rerun()
-        elif pass_input != "":
-            st.error("Incorrect Code")
+                # 2. Save a cookie that lasts for 7 days
+                cookie_manager.set(
+                    "is_authenticated",
+                    "true",
+                    expires_at=datetime.now() + timedelta(days=7)
+                )
+                st.rerun()
+            else:
+                st.error("Invalid Code")
     st.stop()
 
 # --- 2. DATA SETUP ---
@@ -68,7 +90,7 @@ for i in range(st.session_state.section_count):
     with st.container(border=True):
         st.subheader(f"Topic {i + 1}")
         s = st.text_input(f"Subject", key=f"s_{i}", placeholder="e.g., Leadership Updates")
-        d = st.text_area(f"Details (Bulleted List)", key=f"d_{i}", placeholder="• Item 1\n• Item 2")
+        d = st.text_area(f"Details - Tip: draft message in telegram, then copy/paste in here to keep formatting and emojis", key=f"d_{i}", placeholder="• Item 1\n• Item 2")
         full_bulletin_data.append({"subject": s, "details": d})
 
 if st.button("➕ Add Another Topic"):
@@ -130,7 +152,8 @@ with st.container(border=True):
         subj = sec['subject'].strip()
         det = sec['details'].strip()
         if subj:
-            preview_parts.append(f"**{subj.upper()}**\n{det}")
+            # We use HTML tags here so they match the Telegram style
+            preview_parts.append(f"<b><u>{subj}</u></b><br>{det}")
 
     preview_text = "\n\n---\n\n".join(preview_parts)
     if sender_name:
@@ -147,10 +170,14 @@ with st.container(border=True):
             else:
                 st.info(f"📄 {first_file.name} (Document)")
         with col2:
-            st.markdown(preview_text)
+            # --- UPDATE 1 HERE ---
+            st.markdown(preview_text.replace("\n", "<br>"), unsafe_allow_html=True)
     else:
-        # Text-only preview
-        st.markdown(preview_text if preview_text else "*(Start typing above to see preview)*")
+        # --- UPDATE 2 HERE ---
+        if preview_text:
+            st.markdown(preview_text.replace("\n", "<br>"), unsafe_allow_html=True)
+        else:
+            st.markdown("*(Start typing above to see preview)*")
 
 # --- 5. BROADCAST LOGIC ---
 if st.button("🚀 SEND ANNOUNCEMENT(S)", type="primary", use_container_width=True):
@@ -175,7 +202,7 @@ if st.button("🚀 SEND ANNOUNCEMENT(S)", type="primary", use_container_width=Tr
             subj = escape_html(sec['subject']).strip()
             det = escape_html(sec['details']).strip()
             if subj:
-                parts.append(f"<b><u>{subj}</u></b>\n{det}")
+                parts.append(f"<b><u>{subj}</u></b>\n\n{det}")
 
         formatted_msg = "\n\n———\n\n".join(parts)
 
@@ -283,3 +310,14 @@ if st.button("🚀 SEND ANNOUNCEMENT(S)", type="primary", use_container_width=Tr
                 print(f"Admin notification failed: {e}")
 
         st.success(f"✅ Done! Sent to {success_count} officers with {len(uploaded_files)} attachment(s).")
+
+# --- 6. LOGOUT SECTION (OPTIONAL BUT RECOMMENDED) ---
+st.divider()
+with st.expander("🔐 App Settings"):
+    if st.button("Logout and Lock App"):
+        # 1. Clear the cookie so the browser forgets the login
+        cookie_manager.delete("is_authenticated")
+        # 2. Clear the session state
+        st.session_state["authenticated"] = False
+        # 3. Refresh to show the login screen
+        st.rerun()
