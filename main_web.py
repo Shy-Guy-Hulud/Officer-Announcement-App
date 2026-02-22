@@ -29,7 +29,7 @@ if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
 if not st.session_state["authenticated"]:
-    st.title("🔐 Visitation App")
+    st.title("🔐 Officer Announcement Tool")
     with st.form("login_form"):
         pwd_input = st.text_input("Enter Access Code", type="password")
         if st.form_submit_button("Login"):
