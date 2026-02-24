@@ -2,9 +2,11 @@ name: Streamlit Keep Alive
 
 on:
   schedule:
+
     # Runs at the start of every 6th hour (00:00, 06:00, 12:00, 18:00 UTC)
     - cron: '0 */6 * * *'
   workflow_dispatch: # Keeps the manual "Run" button available
+
 
 jobs:
   heartbeat:
@@ -15,7 +17,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+
           fetch-depth: 0
+
+          fetch-depth: 0 # Fetches full history so we can amend
+
 
       - name: Update timestamp
         run: echo $(date) > heartbeat.txt
@@ -25,6 +31,10 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add heartbeat.txt
+
           # Amends the same commit to keep history clean
+
+          # If a heartbeat commit exists, update it. If not, create a new one.
+
           git commit --amend -m "Heartbeat: Keep Streamlit App Awake" || git commit -m "Heartbeat: Keep Streamlit App Awake"
           git push --force
