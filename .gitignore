@@ -1,0 +1,9 @@
+# Ignore the virtual environment
+.venv/
+
+# Ignore your local secrets
+.streamlit/
+
+# Ignore Python's internal cache files
+__pycache__/
+*.pyc

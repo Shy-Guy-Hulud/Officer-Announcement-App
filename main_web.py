@@ -120,22 +120,32 @@ send_to_all = st.checkbox("🚨 SEND TO ALL OFFICERS", value=False)
 
 # --- NEW: LIVE RECIPIENT PREVIEW ---
 preview_list = []
+missing_id_list = []  # Track names of people missing Chat_IDs
+
 if send_to_all:
-    preview_list = [person['Name'] for person in all_records]
+    for person in all_records:
+        preview_list.append(person['Name'])
+        # Check if Chat_ID is missing or empty
+        if not str(person.get('Chat_ID')).strip():
+            missing_id_list.append(person['Name'])
 elif selected_groups:
     for person in all_records:
         for group in selected_groups:
             if str(person.get(group)).strip().lower() == "yes":
                 if person['Name'] not in preview_list:
                     preview_list.append(person['Name'])
+                    # Check if Chat_ID is missing or empty
+                    if not str(person.get('Chat_ID')).strip():
+                        missing_id_list.append(person['Name'])
                 break
 
-if preview_list:
-    # We sort the list alphabetically so it's easy to find a specific name
-    sorted_names = sorted(preview_list)
+# Display the warning if anyone is missing a Chat_ID
+if missing_id_list:
+    st.error(f"⚠️ **Missing Telegram IDs:** {', '.join(missing_id_list)}. These officers will not receive the announcement.")
 
+if preview_list:
+    sorted_names = sorted(preview_list)
     with st.expander(f"👁️ View Recipients ({len(sorted_names)} people total)"):
-        # We join the names with a newline and a bullet point
         bulleted_list = "\n".join([f"* {name}" for name in sorted_names])
         st.markdown(bulleted_list)
 else:
