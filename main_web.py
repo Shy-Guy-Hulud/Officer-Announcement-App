@@ -151,18 +151,16 @@ if preview_list:
 else:
     st.caption("No recipients selected yet.")
 
-# --- NEW: LIVE PREVIEW ---
+# --- UPDATED: LIVE PREVIEW ---
 st.divider()
 st.subheader("🖼️ Announcement Preview")
 
 with st.container(border=True):
-    # Construct the message text exactly as it will appear
     preview_parts = []
     for sec in full_bulletin_data:
         subj = sec['subject'].strip()
         det = sec['details'].strip()
         if subj:
-            # We use HTML tags here so they match the Telegram style
             preview_parts.append(f"<b><u>{subj}</u></b><br>{det}")
 
     preview_text = "\n\n---\n\n".join(preview_parts)
@@ -171,19 +169,28 @@ with st.container(border=True):
 
     # UI Layout for the preview
     if uploaded_files:
+        # 1. Identify the first image as the 'Cover'
+        first_image = next((f for f in uploaded_files if f.type.startswith("image")), None)
+        other_files = [f for f in uploaded_files if f != first_image]
+
         col1, col2 = st.columns([1, 2])
         with col1:
-            # Show the first uploaded file as the primary preview image
-            first_file = uploaded_files[0]
-            if first_file.type.startswith("image"):
-                st.image(first_file, caption="Primary Attachment")
+            if first_image:
+                st.image(first_image, caption="Main Announcement Image")
             else:
-                st.info(f"📄 {first_file.name} (Document)")
+                st.info("ℹ️ No image: Text will be sent first.")
+
         with col2:
-            # --- UPDATE 1 HERE ---
             st.markdown(preview_text.replace("\n", "<br>"), unsafe_allow_html=True)
+
+        # 2. Show the "Follow-up" blurb for other files
+        if other_files:
+            st.write("---")
+            st.caption("📂 **Additional files to be sent as separate messages:**")
+            for f in other_files:
+                icon = "🖼️" if f.type.startswith("image") else "📄"
+                st.markdown(f"{icon} `{f.name}`")
     else:
-        # --- UPDATE 2 HERE ---
         if preview_text:
             st.markdown(preview_text.replace("\n", "<br>"), unsafe_allow_html=True)
         else:
@@ -243,51 +250,44 @@ if st.button("🚀 SEND ANNOUNCEMENT(S)", type="primary", use_container_width=Tr
                     }
                     r = requests.post(url, json=payload)
 
-                # SCENARIO B: Single File (Image or PDF)
-                elif len(uploaded_files) == 1:
-                    file = uploaded_files[0]
-                    # Reset file pointer to beginning after each recipient
-                    file.seek(0)
+                # --- UPDATED BROADCAST LOGIC (Scenario B & C combined) ---
+                elif uploaded_files:
+                    # 1. Separate the first image from the rest of the files
+                    first_image = next((f for f in uploaded_files if f.type.startswith("image")), None)
+                    other_files = [f for f in uploaded_files if f != first_image]
 
-                    # Determine if it's a photo or document
-                    method = "sendPhoto" if file.type.startswith("image") else "sendDocument"
-                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
-
-                    files = {method.replace("send", "").lower(): file}
-                    payload = {
-                        "chat_id": chat_id,
-                        "caption": formatted_msg,
-                        "parse_mode": "HTML"
-                    }
-                    r = requests.post(url, data=payload, files=files)
-
-                # SCENARIO C: Multiple Files (Media Group / Album)
-                else:
-                    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMediaGroup"
-                    media = []
-                    files = {}
-
-                    for i, f in enumerate(uploaded_files):
-                        f.seek(0)
-                        file_input_name = f"file{i}"
-                        files[file_input_name] = f
-
-                        # Attach the caption only to the FIRST item in the group
-                        media_item = {
-                            "type": "photo" if f.type.startswith("image") else "document",
-                            "media": f"attach://{file_input_name}"
+                    if first_image:
+                        # Send the FIRST IMAGE with the FULL caption
+                        first_image.seek(0)
+                        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+                        files = {"photo": first_image}
+                        payload = {
+                            "chat_id": chat_id,
+                            "caption": formatted_msg,
+                            "parse_mode": "HTML"
                         }
-                        if i == 0:
-                            media_item["caption"] = formatted_msg
-                            media_item["parse_mode"] = "HTML"
-                        media.append(media_item)
+                        r = requests.post(url, data=payload, files=files)
+                    else:
+                        # If there are NO images, send the TEXT first, then all files
+                        url_text = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                        payload_text = {
+                            "chat_id": chat_id,
+                            "text": formatted_msg,
+                            "parse_mode": "HTML",
+                            "link_preview_options": {"is_disabled": True}
+                        }
+                        r = requests.post(url_text, json=payload_text)
 
-                    payload = {"chat_id": chat_id, "media": requests.utils.quote(str(media).replace("'", '"'))}
-                    # Note: MediaGroup is complex; usually easier to send text THEN files if multi-file.
-                    r = requests.post(url, data={"chat_id": chat_id, "media": json.dumps(media)}, files=files)
+                    # 2. Send all REMAINING files (PDFs or extra images) one by one
+                    if r.status_code == 200:
+                        for f in other_files:
+                            f.seek(0)
+                            method = "sendPhoto" if f.type.startswith("image") else "sendDocument"
+                            file_key = "photo" if f.type.startswith("image") else "document"
 
-                if r.status_code == 200:
-                    success_count += 1
+                            url_file = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
+                            # No caption here to keep the chat clean, or use f.name as a tiny caption
+                            requests.post(url_file, data={"chat_id": chat_id}, files={file_key: f})
 
             except Exception as e:
                 print(f"Error sending to {person['Name']}: {e}")
