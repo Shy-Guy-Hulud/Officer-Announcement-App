@@ -236,10 +236,9 @@ if st.button("🚀 SEND ANNOUNCEMENT(S)", type="primary", use_container_width=Tr
 
         for idx, person in enumerate(final_list):
             chat_id = str(person['Chat_ID'])
-            success = False
 
             try:
-                # SCENARIO A: No files - Send standard Text message
+                # SCENARIO A: No files
                 if not uploaded_files:
                     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
                     payload = {
@@ -249,34 +248,32 @@ if st.button("🚀 SEND ANNOUNCEMENT(S)", type="primary", use_container_width=Tr
                         "link_preview_options": {"is_disabled": True}
                     }
                     r = requests.post(url, json=payload)
+                    # ADD THIS:
+                    if r.status_code == 200:
+                        success_count += 1
 
-                # --- UPDATED BROADCAST LOGIC (Scenario B & C combined) ---
+                # SCENARIO B & C: With files
                 elif uploaded_files:
-                    # 1. Separate the first image from the rest of the files
                     first_image = next((f for f in uploaded_files if f.type.startswith("image")), None)
-                    other_files = [f for f in uploaded_files if f != first_image]
 
                     if first_image:
-                        # Send the FIRST IMAGE with the FULL caption
                         first_image.seek(0)
                         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
                         files = {"photo": first_image}
-                        payload = {
-                            "chat_id": chat_id,
-                            "caption": formatted_msg,
-                            "parse_mode": "HTML"
-                        }
+                        payload = {"chat_id": chat_id, "caption": formatted_msg, "parse_mode": "HTML"}
                         r = requests.post(url, data=payload, files=files)
                     else:
-                        # If there are NO images, send the TEXT first, then all files
                         url_text = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-                        payload_text = {
-                            "chat_id": chat_id,
-                            "text": formatted_msg,
-                            "parse_mode": "HTML",
-                            "link_preview_options": {"is_disabled": True}
-                        }
+                        payload_text = {"chat_id": chat_id, "text": formatted_msg, "parse_mode": "HTML"}
                         r = requests.post(url_text, json=payload_text)
+
+                    # ADD THIS:
+                    if r.status_code == 200:
+                        success_count += 1
+                        # Send remaining files...
+                        other_files = [f for f in uploaded_files if f != first_image]
+                        for f in other_files:
+                            f.seek(0)
 
                     # 2. Send all REMAINING files (PDFs or extra images) one by one
                     if r.status_code == 200:
